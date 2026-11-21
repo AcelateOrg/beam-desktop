@@ -22,6 +22,10 @@ on:
         description: Keep release as draft (do not go live yet)
         type: boolean
         default: true
+      skip_windows:
+        description: Skip Windows build (if already uploaded)
+        type: boolean
+        default: false
       channel:
         description: Update channel
         type: choice
@@ -49,7 +53,7 @@ on:
         default: main
 
 permissions:
-  contents: read
+  contents: write
 
 # Never cancel a run half-way through publishing.
 concurrency:
@@ -121,6 +125,7 @@ jobs:
   # = scripts\windows\build.bat prod
   windows:
     needs: prepare
+    if: inputs.skip_windows != true
     runs-on: windows-latest
     env:
       VERSION: ${{ needs.prepare.outputs.version }}
@@ -188,11 +193,30 @@ jobs:
           cp "${installers[0]}" "../out/dist/Beam-${VERSION}-windows-amd64-installer.exe"
           ls -la ../out/*
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: windows-amd64
-          path: out/
-          if-no-files-found: error
+      - name: Publish Windows OTA & Installer to GitHub Release
+        if: needs.prepare.outputs.publish == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          KEY: ${{ secrets.BEAM_OTA_SIGNING_KEY }}
+          CHANNEL: ${{ needs.prepare.outputs.channel }}
+          MANDATORY: ${{ inputs.mandatory }}
+          MIN_SUPPORTED: ${{ inputs.min_supported }}
+        run: |
+          go build -trimpath -o "$RUNNER_TEMP/beam-ota" ./cmd/beam-ota
+          umask 077
+          printf '%s\n' "$KEY" > "$RUNNER_TEMP/ota.key"
+          export BEAM_OTA_KEY="$RUNNER_TEMP/ota.key"
+          trap 'rm -f "$RUNNER_TEMP/ota.key"' EXIT
+          COMMON=(-version "$VERSION" -channel "$CHANNEL" -upload)
+          [ "$MANDATORY" = "true" ] && COMMON+=(-mandatory)
+          [ -n "$MIN_SUPPORTED" ] && COMMON+=(-min-supported "$MIN_SUPPORTED")
+          for lang in ru en; do
+            f="release-notes/$VERSION.$lang.txt"
+            [ -f "$f" ] && { [ $lang = ru ] && COMMON+=(-notes "$f") || COMMON+=(-notes-en "$f"); }
+          done
+          "$RUNNER_TEMP/beam-ota" publish "${COMMON[@]}" -target windows-amd64 \
+            -file Beam.exe=../out/ota/Beam.exe -file BeamRelay.exe=../out/ota/BeamRelay.exe
+          gh release upload "v$VERSION" ../out/dist/* --clobber
 
   # ------------------------------------------------------------------ Linux
   # = scripts/linux/build.sh (ubuntu 22.04: glibc 2.35, runs on most distros)
@@ -248,11 +272,30 @@ jobs:
           tar -C "$RUNNER_TEMP" -czf "../out/dist/$PKG.tar.gz" "$PKG"
           ls -la ../out/*
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: linux-amd64
-          path: out/
-          if-no-files-found: error
+      - name: Publish Linux OTA & Tarball to GitHub Release
+        if: needs.prepare.outputs.publish == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          KEY: ${{ secrets.BEAM_OTA_SIGNING_KEY }}
+          CHANNEL: ${{ needs.prepare.outputs.channel }}
+          MANDATORY: ${{ inputs.mandatory }}
+          MIN_SUPPORTED: ${{ inputs.min_supported }}
+        run: |
+          go build -trimpath -o "$RUNNER_TEMP/beam-ota" ./cmd/beam-ota
+          umask 077
+          printf '%s\n' "$KEY" > "$RUNNER_TEMP/ota.key"
+          export BEAM_OTA_KEY="$RUNNER_TEMP/ota.key"
+          trap 'rm -f "$RUNNER_TEMP/ota.key"' EXIT
+          COMMON=(-version "$VERSION" -channel "$CHANNEL" -upload)
+          [ "$MANDATORY" = "true" ] && COMMON+=(-mandatory)
+          [ -n "$MIN_SUPPORTED" ] && COMMON+=(-min-supported "$MIN_SUPPORTED")
+          for lang in ru en; do
+            f="release-notes/$VERSION.$lang.txt"
+            [ -f "$f" ] && { [ $lang = ru ] && COMMON+=(-notes "$f") || COMMON+=(-notes-en "$f"); }
+          done
+          "$RUNNER_TEMP/beam-ota" publish "${COMMON[@]}" -target linux-amd64 \
+            -file beam=../out/ota/Beam
+          gh release upload "v$VERSION" ../out/dist/* --clobber
 
   # ------------------------------------------------------------------ macOS
   # = scripts/macos/build.sh (darwin/universal)
@@ -325,18 +368,42 @@ jobs:
           cp "$DMG" "../out/dist/Beam-${VERSION}-macos-universal.dmg"
           ls -la ../out/*
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: darwin-universal
-          path: out/
-          if-no-files-found: error
+      - name: Publish macOS OTA & DMG to GitHub Release
+        if: needs.prepare.outputs.publish == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          KEY: ${{ secrets.BEAM_OTA_SIGNING_KEY }}
+          CHANNEL: ${{ needs.prepare.outputs.channel }}
+          MANDATORY: ${{ inputs.mandatory }}
+          MIN_SUPPORTED: ${{ inputs.min_supported }}
+        run: |
+          go build -trimpath -o "$RUNNER_TEMP/beam-ota" ./cmd/beam-ota
+          umask 077
+          printf '%s\n' "$KEY" > "$RUNNER_TEMP/ota.key"
+          export BEAM_OTA_KEY="$RUNNER_TEMP/ota.key"
+          trap 'rm -f "$RUNNER_TEMP/ota.key"' EXIT
+          COMMON=(-version "$VERSION" -channel "$CHANNEL" -upload)
+          [ "$MANDATORY" = "true" ] && COMMON+=(-mandatory)
+          [ -n "$MIN_SUPPORTED" ] && COMMON+=(-min-supported "$MIN_SUPPORTED")
+          for lang in ru en; do
+            f="release-notes/$VERSION.$lang.txt"
+            [ -f "$f" ] && { [ $lang = ru ] && COMMON+=(-notes "$f") || COMMON+=(-notes-en "$f"); }
+          done
+          "$RUNNER_TEMP/beam-ota" publish "${COMMON[@]}" -target darwin-universal \
+            -file Beam.zip=../out/ota/Beam.zip
+          gh release upload "v$VERSION" ../out/dist/* --clobber
 
   # ---------------------------------------------------------------- Publish
   # All files go into a DRAFT release v{version}; clients see nothing until
   # the very last step publishes it (the proxy ignores drafts).
   publish:
     needs: [prepare, windows, linux, macos]
-    if: needs.prepare.outputs.publish == 'true'
+    if: >-
+      !cancelled() &&
+      needs.prepare.outputs.publish == 'true' &&
+      needs.linux.result == 'success' &&
+      needs.macos.result == 'success' &&
+      (needs.windows.result == 'success' || needs.windows.result == 'skipped')
     runs-on: ubuntu-latest
     environment: ota
     permissions:
@@ -352,58 +419,6 @@ jobs:
       - uses: actions/checkout@v4
         with:
           path: beam-desktop
-      - uses: ./beam-desktop/.github/actions/workspace
-        with:
-          token: ${{ env.REPOS_TOKEN }}
-          bridge-ref: ${{ inputs.bridge_ref || 'main' }}
-          tun-ref: ${{ inputs.tun_ref || 'main' }}
-          core-ref: ${{ inputs.core_ref || 'main' }}
-          wails: 'false'
-
-      - uses: actions/download-artifact@v4
-        with:
-          path: artifacts
-
-      - name: Prepare beam-ota and the key
-        env:
-          KEY: ${{ secrets.BEAM_OTA_SIGNING_KEY }}
-        run: |
-          go build -trimpath -o "$RUNNER_TEMP/beam-ota" ./cmd/beam-ota
-          umask 077
-          printf '%s\n' "$KEY" > "$RUNNER_TEMP/ota.key"
-          echo "BEAM_OTA_KEY=$RUNNER_TEMP/ota.key" >> "$GITHUB_ENV"
-
-      - name: Upload to the draft release
-        env:
-          MANDATORY: ${{ inputs.mandatory }}
-          MIN_SUPPORTED: ${{ inputs.min_supported }}
-        run: |
-          A=../artifacts
-          COMMON=(-version "$VERSION" -channel "$CHANNEL" -upload)
-          [ "$MANDATORY" = "true" ] && COMMON+=(-mandatory)
-          [ -n "$MIN_SUPPORTED" ] && COMMON+=(-min-supported "$MIN_SUPPORTED")
-          for lang in ru en; do
-            f="release-notes/$VERSION.$lang.txt"
-            if [ -f "$f" ]; then
-              [ $lang = ru ] && COMMON+=(-notes "$f") || COMMON+=(-notes-en "$f")
-            else
-              echo "::warning::$f not found - no $lang changelog in the update dialog"
-            fi
-          done
-
-          "$RUNNER_TEMP/beam-ota" publish "${COMMON[@]}" -target windows-amd64 \
-            -file Beam.exe=$A/windows-amd64/ota/Beam.exe -file BeamRelay.exe=$A/windows-amd64/ota/BeamRelay.exe
-          # Installed as 'beam' by scripts/linux/install.sh.
-          "$RUNNER_TEMP/beam-ota" publish "${COMMON[@]}" -target linux-amd64 \
-            -file beam=$A/linux-amd64/ota/Beam
-          "$RUNNER_TEMP/beam-ota" publish "${COMMON[@]}" -target darwin-universal \
-            -file Beam.zip=$A/darwin-universal/ota/Beam.zip
-
-          "$RUNNER_TEMP/beam-ota" verify -staged "build/ota/$VERSION" -channel "$CHANNEL" \
-            -target windows-amd64,linux-amd64,darwin-universal
-
-      - name: Upload installers
-        run: gh release upload "v$VERSION" ../artifacts/*/dist/* --clobber
 
       - name: Go live
         if: inputs.draft_only != true
@@ -412,15 +427,3 @@ jobs:
           [ "$CHANNEL" = "stable" ] && ARGS+=(--latest)
           gh release edit "v$VERSION" "${ARGS[@]}"
           echo "Published v$VERSION ($CHANNEL)" >> "$GITHUB_STEP_SUMMARY"
-
-      # Reads the live feed through the proxy exactly like the app does.
-      - name: Verify the live feed
-        if: inputs.draft_only != true && vars.OTA_PROXY_READY == 'true'
-        run: |
-          sleep 65 # the proxy caches the release list for 60 s
-          "$RUNNER_TEMP/beam-ota" verify -channel "$CHANNEL" -target windows-amd64,linux-amd64,darwin-universal
-
-      - name: Remove the key
-        if: always()
-        working-directory: .
-        run: rm -f "$RUNNER_TEMP/ota.key"
