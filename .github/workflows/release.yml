@@ -258,7 +258,7 @@ jobs:
   # = scripts/macos/build.sh (darwin/universal)
   macos:
     needs: prepare
-    runs-on: macos-14
+    runs-on: macos-15
     env:
       VERSION: ${{ needs.prepare.outputs.version }}
       GO_LDFLAGS: -X main.version=${{ needs.prepare.outputs.version }} -X main.variant=release -X main.buildHash=${{ needs.prepare.outputs.hash }}
