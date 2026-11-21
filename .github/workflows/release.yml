@@ -18,6 +18,10 @@ on:
         description: Publish as an OTA update (otherwise only build artifacts)
         type: boolean
         default: false
+      draft_only:
+        description: Keep release as draft (do not go live yet)
+        type: boolean
+        default: true
       channel:
         description: Update channel
         type: choice
@@ -120,7 +124,7 @@ jobs:
     runs-on: windows-latest
     env:
       VERSION: ${{ needs.prepare.outputs.version }}
-      LDFLAGS: -X main.version=${{ needs.prepare.outputs.version }} -X main.variant=release -X main.buildHash=${{ needs.prepare.outputs.hash }}
+      GO_LDFLAGS: -X main.version=${{ needs.prepare.outputs.version }} -X main.variant=release -X main.buildHash=${{ needs.prepare.outputs.hash }}
     defaults:
       run:
         shell: bash
@@ -164,7 +168,7 @@ jobs:
 
       # No -clean: it would wipe BeamRelay.exe and wintun.dll from build/bin.
       - name: Build Beam + NSIS installer
-        run: wails build -trimpath -platform windows/amd64 -ldflags "$LDFLAGS" -nsis
+        run: wails build -trimpath -platform windows/amd64 -ldflags "$GO_LDFLAGS" -nsis
 
       # wails exits 0 even when NSIS failed - trust the files, not the exit code.
       - name: Collect
@@ -197,7 +201,7 @@ jobs:
     runs-on: ubuntu-22.04
     env:
       VERSION: ${{ needs.prepare.outputs.version }}
-      LDFLAGS: -X main.version=${{ needs.prepare.outputs.version }} -X main.variant=release -X main.buildHash=${{ needs.prepare.outputs.hash }}
+      GO_LDFLAGS: -X main.version=${{ needs.prepare.outputs.version }} -X main.variant=release -X main.buildHash=${{ needs.prepare.outputs.hash }}
     defaults:
       run:
         working-directory: beam-desktop
@@ -225,7 +229,7 @@ jobs:
           elif pkg-config --exists webkit2gtk-4.0; then TAGS=
           else echo "::error::webkit2gtk not found"; exit 1; fi
           echo "Tags: ${TAGS:-<none>}"
-          wails build -trimpath -clean -platform linux/amd64 ${TAGS:+-tags "$TAGS"} -ldflags "$LDFLAGS"
+          wails build -trimpath -clean -platform linux/amd64 ${TAGS:+-tags "$TAGS"} -ldflags "$GO_LDFLAGS"
 
       # The tarball keeps the repo layout scripts/linux/install.sh expects, so
       # users install with the same script: ./scripts/linux/install.sh --no-build
@@ -257,7 +261,7 @@ jobs:
     runs-on: macos-14
     env:
       VERSION: ${{ needs.prepare.outputs.version }}
-      LDFLAGS: -X main.version=${{ needs.prepare.outputs.version }} -X main.variant=release -X main.buildHash=${{ needs.prepare.outputs.hash }}
+      GO_LDFLAGS: -X main.version=${{ needs.prepare.outputs.version }} -X main.variant=release -X main.buildHash=${{ needs.prepare.outputs.hash }}
       APP: build/bin/Beam.app
     defaults:
       run:
@@ -280,7 +284,7 @@ jobs:
 
       - name: Build Beam.app
         run: |
-          wails build -trimpath -clean -platform darwin/universal -ldflags "$LDFLAGS"
+          wails build -trimpath -clean -platform darwin/universal -ldflags "$GO_LDFLAGS"
           test -d "$APP" || { echo "::error::$APP not found after the build"; exit 1; }
 
       # build.sh only warns here; in CI a bundle without the relay would ship
@@ -309,7 +313,7 @@ jobs:
       - name: DMG
         run: |
           rm -f build/bin/*.dmg
-          create-dmg --overwrite --no-code-sign "$APP" build/bin
+          create-dmg --overwrite --no-code-sign "$APP" build/bin || [ $? -eq 2 ]
           DMG="$(ls -t build/bin/*.dmg 2>/dev/null | head -1)"
           test -n "$DMG" || { echo "::error::create-dmg produced no .dmg"; exit 1; }
           echo "DMG=$DMG" >> "$GITHUB_ENV"
@@ -402,6 +406,7 @@ jobs:
         run: gh release upload "v$VERSION" ../artifacts/*/dist/* --clobber
 
       - name: Go live
+        if: inputs.draft_only != true
         run: |
           ARGS=(--draft=false)
           [ "$CHANNEL" = "stable" ] && ARGS+=(--latest)
@@ -410,7 +415,7 @@ jobs:
 
       # Reads the live feed through the proxy exactly like the app does.
       - name: Verify the live feed
-        if: vars.OTA_PROXY_READY == 'true'
+        if: inputs.draft_only != true && vars.OTA_PROXY_READY == 'true'
         run: |
           sleep 65 # the proxy caches the release list for 60 s
           "$RUNNER_TEMP/beam-ota" verify -channel "$CHANNEL" -target windows-amd64,linux-amd64,darwin-universal

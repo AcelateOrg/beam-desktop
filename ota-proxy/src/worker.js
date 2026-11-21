@@ -5,7 +5,7 @@
 //                                               of the highest published version that has it
 //   /v1/releases/{target}/{version}.json[.sig]  asset ota-release-{target}.json of v{version}
 //   /v1/assets/{tag}/{asset}                    HEAD: size; GET: 302 to GitHub's signed URL
-//   /download/{windows|macos|linux}             installer of the highest published stable
+//   /download/{windows|macos|linux|android}     installer of the highest published stable
 //                                               version (for the website; never changes)
 //
 // The proxy is stateless and NOT trusted by clients: every pointer and
@@ -43,8 +43,9 @@ function config(env) {
     (env && env[name]) ?? (globalThis.Deno ? globalThis.Deno.env.get(name) : undefined);
   const token = get("GITHUB_TOKEN");
   const repo = get("GITHUB_REPO") || "AcelateOrg/beam-desktop";
+  const mobileRepo = get("GITHUB_MOBILE_REPO") || "AcelateOrg/beam-mobile";
   if (!token) throw new HttpError(500, "GITHUB_TOKEN is not configured");
-  return { token, repo };
+  return { token, repo, mobileRepo };
 }
 
 class HttpError extends Error {
@@ -82,7 +83,8 @@ function compareVersions(a, b) {
 // skipped: a release goes live only when it is published, and unpublishing
 // it (back to draft) rolls clients back to the previous one.
 function releases(cfg) {
-  return cached("releases", RELEASES_TTL_MS, async () => {
+  const cacheKey = cfg.repo === "AcelateOrg/beam-mobile" ? `releases:${cfg.repo}` : "releases";
+  return cached(cacheKey, RELEASES_TTL_MS, async () => {
     const out = [];
     for (let page = 1; page <= 3; page++) {
       const resp = await gh(cfg, `/repos/${cfg.repo}/releases?per_page=100&page=${page}`);
@@ -95,7 +97,7 @@ function releases(cfg) {
           tag: r.tag_name,
           version,
           prerelease: Boolean(r.prerelease),
-          assets: new Map(r.assets.map((a) => [a.name, { id: a.id, name: a.name, size: a.size }])),
+          assets: new Map(r.assets.map((a) => [a.name, { id: a.id, name: a.name, size: a.size, repo: cfg.repo }])),
         });
       }
       if (list.length < 100) break;
@@ -107,8 +109,9 @@ function releases(cfg) {
 
 // The signed URL GitHub redirects an asset download to (valid ~5 minutes).
 function assetLocation(cfg, asset) {
-  return cached(`loc:${asset.id}`, ASSET_TTL_MS, async () => {
-    const resp = await gh(cfg, `/repos/${cfg.repo}/releases/assets/${asset.id}`, {
+  const repo = asset.repo || cfg.repo;
+  return cached(`loc:${repo}:${asset.id}`, ASSET_TTL_MS, async () => {
+    const resp = await gh(cfg, `/repos/${repo}/releases/assets/${asset.id}`, {
       headers: { Accept: "application/octet-stream" },
       redirect: "manual",
     });
@@ -145,11 +148,23 @@ const DOWNLOADS = {
   windows: /^Beam-\d+\.\d+\.\d+-windows-amd64-installer\.exe$/,
   macos: /^Beam-\d+\.\d+\.\d+-macos-universal\.dmg$/,
   linux: /^Beam-\d+\.\d+\.\d+-linux-amd64\.tar\.gz$/,
+  android: /^BEAM-.*\.apk$/i,
 };
 
 async function newestDownload(cfg, platform) {
   const re = DOWNLOADS[platform];
   if (!re) return null;
+  if (platform === "android") {
+    try {
+      const mobileCfg = { ...cfg, repo: cfg.mobileRepo || "AcelateOrg/beam-mobile" };
+      for (const r of await releases(mobileCfg)) {
+        if (r.prerelease) continue;
+        for (const asset of r.assets.values()) if (re.test(asset.name)) return asset;
+      }
+    } catch (_) {
+      // fall through to main repo if token doesn't cover mobileRepo
+    }
+  }
   for (const r of await releases(cfg)) {
     if (r.prerelease) continue;
     for (const asset of r.assets.values()) if (re.test(asset.name)) return asset;

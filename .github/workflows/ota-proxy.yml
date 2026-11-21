@@ -36,7 +36,7 @@ jobs:
       - uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID || '627d5cd8593f6dd1f014c97ad9579ce2' }}
           workingDirectory: ota-proxy
           secrets: GITHUB_TOKEN
         env:
