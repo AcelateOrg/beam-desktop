@@ -142,4 +142,6 @@ func waitForProcessExit(pid int, timeout time.Duration) {
 		}
 		time.Sleep(200 * time.Millisecond)
 	}
+	_ = syscall.Kill(pid, syscall.SIGKILL)
+	time.Sleep(300 * time.Millisecond)
 }

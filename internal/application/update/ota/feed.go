@@ -3,9 +3,11 @@ package ota
 import (
 	"context"
 	"crypto/ed25519"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -32,7 +34,41 @@ type HTTPSource struct {
 	UserAgent string
 }
 
+// feedTransport disables keep-alive and HTTP/2 multiplexing so every small
+// feed file (.json, .sig) uses its own fresh TCP connection, staying well
+// below the ~16 KB per-connection DPI stall threshold on Russian ISPs.
+func feedTransport() *http.Transport {
+	return &http.Transport{
+		Proxy:                 http.ProxyFromEnvironment,
+		DialContext:           (&net.Dialer{Timeout: 8 * time.Second}).DialContext,
+		TLSClientConfig:       &tls.Config{ClientSessionCache: tls.NewLRUClientSessionCache(16)},
+		TLSHandshakeTimeout:   8 * time.Second,
+		ResponseHeaderTimeout: 10 * time.Second,
+		DisableKeepAlives:     true,
+		TLSNextProto:          map[string]func(string, *tls.Conn) http.RoundTripper{},
+	}
+}
+
 func (s HTTPSource) Fetch(ctx context.Context, sitePath string) ([]byte, error) {
+	var lastErr error
+	for attempt := 0; attempt < 3; attempt++ {
+		if attempt > 0 {
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case <-time.After(time.Duration(attempt) * 400 * time.Millisecond):
+			}
+		}
+		data, err := s.fetchOnce(ctx, sitePath)
+		if err == nil || errors.Is(err, ErrNotFound) {
+			return data, err
+		}
+		lastErr = err
+	}
+	return nil, lastErr
+}
+
+func (s HTTPSource) fetchOnce(ctx context.Context, sitePath string) ([]byte, error) {
 	url := trimSlash(s.BaseURL) + sitePath
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
@@ -40,12 +76,15 @@ func (s HTTPSource) Fetch(ctx context.Context, sitePath string) ([]byte, error) 
 	}
 	// The pointer changes in place; ask caches in between for a fresh copy.
 	req.Header.Set("Cache-Control", "no-cache")
+	req.Close = true
 	if s.UserAgent != "" {
 		req.Header.Set("User-Agent", s.UserAgent)
 	}
 	client := s.Client
 	if client == nil {
-		client = &http.Client{Timeout: 15 * time.Second}
+		tr := feedTransport()
+		defer tr.CloseIdleConnections()
+		client = &http.Client{Transport: tr, Timeout: 12 * time.Second}
 	}
 	resp, err := client.Do(req)
 	if err != nil {

@@ -7,11 +7,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"beam-app/internal/application/update/ota"
 	"beam-app/internal/platform"
@@ -28,7 +26,6 @@ func (s *Service) CheckForUpdate(ctx context.Context, currentVersion string) (*U
 	feed := &ota.Feed{
 		Source: ota.HTTPSource{
 			BaseURL:   s.baseURL,
-			Client:    &http.Client{Timeout: 15 * time.Second},
 			UserAgent: s.userAgent,
 		},
 		Keys: keys,

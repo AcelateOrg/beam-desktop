@@ -207,7 +207,7 @@ jobs:
           printf '%s\n' "$KEY" > "$RUNNER_TEMP/ota.key"
           export BEAM_OTA_KEY="$RUNNER_TEMP/ota.key"
           trap 'rm -f "$RUNNER_TEMP/ota.key"' EXIT
-          COMMON=(-version "$VERSION" -channel "$CHANNEL" -upload)
+          COMMON=(-version "$VERSION" -channel "$CHANNEL" -upload -force)
           [ "$MANDATORY" = "true" ] && COMMON+=(-mandatory)
           [ -n "$MIN_SUPPORTED" ] && COMMON+=(-min-supported "$MIN_SUPPORTED")
           for lang in ru en; do
@@ -286,7 +286,7 @@ jobs:
           printf '%s\n' "$KEY" > "$RUNNER_TEMP/ota.key"
           export BEAM_OTA_KEY="$RUNNER_TEMP/ota.key"
           trap 'rm -f "$RUNNER_TEMP/ota.key"' EXIT
-          COMMON=(-version "$VERSION" -channel "$CHANNEL" -upload)
+          COMMON=(-version "$VERSION" -channel "$CHANNEL" -upload -force)
           [ "$MANDATORY" = "true" ] && COMMON+=(-mandatory)
           [ -n "$MIN_SUPPORTED" ] && COMMON+=(-min-supported "$MIN_SUPPORTED")
           for lang in ru en; do
@@ -382,15 +382,17 @@ jobs:
           printf '%s\n' "$KEY" > "$RUNNER_TEMP/ota.key"
           export BEAM_OTA_KEY="$RUNNER_TEMP/ota.key"
           trap 'rm -f "$RUNNER_TEMP/ota.key"' EXIT
-          COMMON=(-version "$VERSION" -channel "$CHANNEL" -upload)
+          COMMON=(-version "$VERSION" -channel "$CHANNEL" -upload -force)
           [ "$MANDATORY" = "true" ] && COMMON+=(-mandatory)
           [ -n "$MIN_SUPPORTED" ] && COMMON+=(-min-supported "$MIN_SUPPORTED")
           for lang in ru en; do
             f="release-notes/$VERSION.$lang.txt"
             [ -f "$f" ] && { [ $lang = ru ] && COMMON+=(-notes "$f") || COMMON+=(-notes-en "$f"); }
           done
-          "$RUNNER_TEMP/beam-ota" publish "${COMMON[@]}" -target darwin-universal \
-            -file Beam.zip=../out/ota/Beam.zip
+          for T in darwin-universal darwin-arm64 darwin-amd64; do
+            "$RUNNER_TEMP/beam-ota" publish "${COMMON[@]}" -target "$T" \
+              -file Beam.zip=../out/ota/Beam.zip
+          done
           gh release upload "v$VERSION" ../out/dist/* --clobber
 
   # ---------------------------------------------------------------- Publish
