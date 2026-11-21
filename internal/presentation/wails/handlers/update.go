@@ -76,8 +76,7 @@ func (h *UpdateHandler) DownloadUpdate() types.APIResponse[bool] {
 }
 
 func (h *UpdateHandler) ApplyUpdate() types.APIResponse[bool] {
-	ctx := h.rt.Context()
-	if ctx == nil {
+	if h.rt.Context() == nil {
 		return types.APIResponse[bool]{Success: false, Error: "the application context is not ready yet"}
 	}
 
@@ -89,7 +88,7 @@ func (h *UpdateHandler) ApplyUpdate() types.APIResponse[bool] {
 		return types.APIResponse[bool]{Success: false, Error: err.Error()}
 	}
 
-	go runtime.Quit(ctx)
+	h.rt.QuitApp()
 
 	return types.APIResponse[bool]{Success: true, Data: true}
 }
