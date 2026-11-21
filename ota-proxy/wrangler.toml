@@ -1,0 +1,18 @@
+# Cloudflare Worker serving the OTA feed - see README.md.
+name = "beam-ota-proxy"
+main = "src/worker.js"
+compatibility_date = "2025-01-01"
+workers_dev = true
+preview_urls = false
+
+# Must match ota.DefaultBaseURL - shipped clients read the feed from here.
+# Cloudflare creates the DNS record itself; there must be no other record
+# for this name in the acelate.com zone. (Top-level keys must stay above
+# [vars], otherwise TOML puts them inside the vars table.)
+routes = [{ pattern = "ota-updates.acelate.com", custom_domain = true }]
+
+[vars]
+GITHUB_REPO = "AcelateOrg/beam-desktop"
+
+# GITHUB_TOKEN is a secret: `wrangler secret put GITHUB_TOKEN`, or the
+# OTA_PROXY_GITHUB_TOKEN repo secret via .github/workflows/ota-proxy.yml.

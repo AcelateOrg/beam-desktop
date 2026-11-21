@@ -1,0 +1,13 @@
+# Auto detect text files and perform LF normalization
+* text=auto
+
+# Shell-скрипты всегда LF, даже в рабочей копии на Windows. С CRLF ядро
+# читает shebang как "/usr/bin/env bash\r" и падает с bad interpreter.
+# Критично, если папка проброшена в виртуалку шарой, а не клонирована
+# через git — тогда нормализации при checkout не происходит.
+*.sh text eol=lf
+
+# Маркеры бинарных файлов — чтобы text=auto их не трогал.
+*.png binary
+*.ico binary
+*.icns binary

@@ -1,0 +1,421 @@
+# Builds Beam for Windows, Linux and macOS exactly like scripts/{windows,linux,macos}/build.*
+# (prod mode: same ldflags, tags, relay, wintun, NSIS, universal bundle, ad-hoc
+# signature, DMG) and, when publishing, ships it as a signed OTA update - see docs/ota.md.
+#
+#   push tag vX.Y.Z           -> build + publish (tag must equal Info.productVersion in wails.json)
+#   Actions -> Release -> Run -> build only, or build + publish with "publish" ticked
+#
+# Secrets: BEAM_REPOS_TOKEN (read access to beam-bridge, beam-tun, xray-core-beam),
+#          BEAM_OTA_SIGNING_KEY (contents of the key made by `beam-ota keygen`).
+name: Release
+
+on:
+  push:
+    tags: ['v*.*.*']
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish as an OTA update (otherwise only build artifacts)
+        type: boolean
+        default: false
+      channel:
+        description: Update channel
+        type: choice
+        options: [stable, beta]
+        default: stable
+      mandatory:
+        description: Mandatory update (users cannot postpone it)
+        type: boolean
+        default: false
+      min_supported:
+        description: Minimum supported version X.Y.Z (older installs must update), empty = none
+        type: string
+        default: ''
+      bridge_ref:
+        description: beam-bridge ref
+        type: string
+        default: main
+      tun_ref:
+        description: beam-tun ref
+        type: string
+        default: main
+      core_ref:
+        description: xray-core-beam ref
+        type: string
+        default: main
+
+permissions:
+  contents: read
+
+# Never cancel a run half-way through publishing.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  REPOS_TOKEN: ${{ secrets.BEAM_REPOS_TOKEN || secrets.BEAM_BRIDGE_TOKEN }}
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+      hash: ${{ steps.meta.outputs.hash }}
+      publish: ${{ steps.meta.outputs.publish }}
+      channel: ${{ steps.meta.outputs.channel }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: meta
+        name: Version and publish checks
+        env:
+          PUBLISH_INPUT: ${{ inputs.publish }}
+          CHANNEL_INPUT: ${{ inputs.channel }}
+          MIN_SUPPORTED: ${{ inputs.min_supported }}
+          HAS_KEY: ${{ secrets.BEAM_OTA_SIGNING_KEY != '' }}
+        run: |
+          VERSION="$(jq -r '.Info.productVersion // empty' wails.json)"
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error file=wails.json::Info.productVersion '$VERSION' is not X.Y.Z"
+            exit 1
+          fi
+          PUBLISH=false
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            if [ "$GITHUB_REF_NAME" != "v$VERSION" ]; then
+              echo "::error::tag $GITHUB_REF_NAME does not match wails.json productVersion $VERSION (want v$VERSION)"
+              exit 1
+            fi
+            PUBLISH=true
+          elif [ "$PUBLISH_INPUT" = "true" ]; then
+            PUBLISH=true
+          fi
+          if [ -n "$MIN_SUPPORTED" ] && ! [[ "$MIN_SUPPORTED" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::min_supported '$MIN_SUPPORTED' is not X.Y.Z"
+            exit 1
+          fi
+          if [ "$PUBLISH" = "true" ]; then
+            # Fail now instead of after 20 minutes of builds.
+            if [ "$HAS_KEY" != "true" ]; then
+              echo "::error::secret BEAM_OTA_SIGNING_KEY is not set (contents of ~/.beam-ota/signing.key)"
+              exit 1
+            fi
+            if ! sed -n '/TrustedPublicKeys = \[\]string{/,/^}/p' internal/application/update/ota/sign.go \
+                | grep -Eq '^[[:space:]]*"[A-Za-z0-9+/=]{40,}"'; then
+              echo "::error file=internal/application/update/ota/sign.go::TrustedPublicKeys is empty - clients would reject every update. Run beam-ota keygen and add the public key."
+              exit 1
+            fi
+          fi
+          {
+            echo "version=$VERSION"
+            echo "hash=${GITHUB_SHA::8}"
+            echo "publish=$PUBLISH"
+            echo "channel=${CHANNEL_INPUT:-stable}"
+          } | tee -a "$GITHUB_OUTPUT"
+          echo "### Beam $VERSION (build ${GITHUB_SHA::8}), publish: $PUBLISH" >> "$GITHUB_STEP_SUMMARY"
+
+  # ---------------------------------------------------------------- Windows
+  # = scripts\windows\build.bat prod
+  windows:
+    needs: prepare
+    runs-on: windows-latest
+    env:
+      VERSION: ${{ needs.prepare.outputs.version }}
+      LDFLAGS: -X main.version=${{ needs.prepare.outputs.version }} -X main.variant=release -X main.buildHash=${{ needs.prepare.outputs.hash }}
+    defaults:
+      run:
+        shell: bash
+        working-directory: beam-desktop
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: beam-desktop
+      - uses: ./beam-desktop/.github/actions/workspace
+        with:
+          token: ${{ env.REPOS_TOKEN }}
+          bridge-ref: ${{ inputs.bridge_ref || 'main' }}
+          tun-ref: ${{ inputs.tun_ref || 'main' }}
+          core-ref: ${{ inputs.core_ref || 'main' }}
+
+      # wails only WARNS and exits 0 without makensis - check it up front.
+      - name: Ensure NSIS
+        shell: pwsh
+        working-directory: .
+        run: |
+          if (-not (Get-Command makensis -ErrorAction SilentlyContinue)) {
+            foreach ($dir in "${env:ProgramFiles(x86)}\NSIS", "$env:ProgramFiles\NSIS") {
+              if (Test-Path "$dir\makensis.exe") { $dir | Out-File $env:GITHUB_PATH -Append -Encoding utf8; exit 0 }
+            }
+            choco install nsis -y --no-progress
+            "${env:ProgramFiles(x86)}\NSIS" | Out-File $env:GITHUB_PATH -Append -Encoding utf8
+          }
+
+      - name: Build BeamRelay
+        env:
+          GOOS: windows
+          GOARCH: amd64
+        run: go build -trimpath -ldflags "-H=windowsgui -X main.variant=release" -o build/bin/BeamRelay.exe ./cmd/beam-relay
+
+      # wireguard/tun loads wintun.dll from the exe dir only, and project.nsi
+      # packs build\bin\wintun.dll - so it must be there BEFORE the NSIS pass.
+      - name: Copy wintun.dll
+        run: |
+          test -f build/windows/wintun/amd64/wintun.dll || { echo "::error::build/windows/wintun/amd64/wintun.dll is missing"; exit 1; }
+          cp build/windows/wintun/amd64/wintun.dll build/bin/wintun.dll
+
+      # No -clean: it would wipe BeamRelay.exe and wintun.dll from build/bin.
+      - name: Build Beam + NSIS installer
+        run: wails build -trimpath -platform windows/amd64 -ldflags "$LDFLAGS" -nsis
+
+      # wails exits 0 even when NSIS failed - trust the files, not the exit code.
+      - name: Collect
+        run: |
+          shopt -s nullglob
+          installers=(build/bin/*installer*.exe)
+          if [ ${#installers[@]} -ne 1 ]; then
+            echo "::error::expected exactly one installer in build/bin, found ${#installers[@]}"
+            ls -la build/bin
+            exit 1
+          fi
+          for f in Beam.exe BeamRelay.exe wintun.dll; do
+            test -s "build/bin/$f" || { echo "::error::build/bin/$f is missing"; exit 1; }
+          done
+          mkdir -p ../out/ota ../out/dist
+          cp build/bin/Beam.exe build/bin/BeamRelay.exe ../out/ota/
+          cp "${installers[0]}" "../out/dist/Beam-${VERSION}-windows-amd64-installer.exe"
+          ls -la ../out/*
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-amd64
+          path: out/
+          if-no-files-found: error
+
+  # ------------------------------------------------------------------ Linux
+  # = scripts/linux/build.sh (ubuntu 22.04: glibc 2.35, runs on most distros)
+  linux:
+    needs: prepare
+    runs-on: ubuntu-22.04
+    env:
+      VERSION: ${{ needs.prepare.outputs.version }}
+      LDFLAGS: -X main.version=${{ needs.prepare.outputs.version }} -X main.variant=release -X main.buildHash=${{ needs.prepare.outputs.hash }}
+    defaults:
+      run:
+        working-directory: beam-desktop
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: beam-desktop
+      - uses: ./beam-desktop/.github/actions/workspace
+        with:
+          token: ${{ env.REPOS_TOKEN }}
+          bridge-ref: ${{ inputs.bridge_ref || 'main' }}
+          tun-ref: ${{ inputs.tun_ref || 'main' }}
+          core-ref: ${{ inputs.core_ref || 'main' }}
+
+      - name: Install system dependencies
+        working-directory: .
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends build-essential pkg-config libgtk-3-dev libwebkit2gtk-4.1-dev
+
+      - name: Build Beam
+        run: |
+          # Same WebKit pick as build.sh; 22.04 has 4.1, so this is webkit2_41.
+          if pkg-config --exists webkit2gtk-4.1; then TAGS=webkit2_41
+          elif pkg-config --exists webkit2gtk-4.0; then TAGS=
+          else echo "::error::webkit2gtk not found"; exit 1; fi
+          echo "Tags: ${TAGS:-<none>}"
+          wails build -trimpath -clean -platform linux/amd64 ${TAGS:+-tags "$TAGS"} -ldflags "$LDFLAGS"
+
+      # The tarball keeps the repo layout scripts/linux/install.sh expects, so
+      # users install with the same script: ./scripts/linux/install.sh --no-build
+      - name: Collect
+        run: |
+          test -s build/bin/Beam || { echo "::error::build/bin/Beam is missing"; exit 1; }
+          PKG="Beam-${VERSION}-linux-amd64"
+          STAGE="$RUNNER_TEMP/$PKG"
+          install -Dm755 build/bin/Beam "$STAGE/build/bin/Beam"
+          install -Dm644 build/appicon.png "$STAGE/build/appicon.png"
+          install -Dm755 scripts/linux/install.sh "$STAGE/scripts/linux/install.sh"
+          install -Dm755 scripts/linux/uninstall.sh "$STAGE/scripts/linux/uninstall.sh"
+          printf 'Beam %s\n\nInstall:   ./scripts/linux/install.sh --no-build\nUninstall: ./scripts/linux/uninstall.sh\n\nNeeds: libgtk-3 libwebkit2gtk-4.1 (sudo apt install libwebkit2gtk-4.1-0 libcap2-bin)\n' "$VERSION" > "$STAGE/README.txt"
+          mkdir -p ../out/ota ../out/dist
+          cp build/bin/Beam ../out/ota/Beam
+          tar -C "$RUNNER_TEMP" -czf "../out/dist/$PKG.tar.gz" "$PKG"
+          ls -la ../out/*
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-amd64
+          path: out/
+          if-no-files-found: error
+
+  # ------------------------------------------------------------------ macOS
+  # = scripts/macos/build.sh (darwin/universal)
+  macos:
+    needs: prepare
+    runs-on: macos-14
+    env:
+      VERSION: ${{ needs.prepare.outputs.version }}
+      LDFLAGS: -X main.version=${{ needs.prepare.outputs.version }} -X main.variant=release -X main.buildHash=${{ needs.prepare.outputs.hash }}
+      APP: build/bin/Beam.app
+    defaults:
+      run:
+        working-directory: beam-desktop
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: beam-desktop
+      - uses: ./beam-desktop/.github/actions/workspace
+        with:
+          token: ${{ env.REPOS_TOKEN }}
+          bridge-ref: ${{ inputs.bridge_ref || 'main' }}
+          tun-ref: ${{ inputs.tun_ref || 'main' }}
+          core-ref: ${{ inputs.core_ref || 'main' }}
+
+      # A release without a DMG cannot be shipped, so this is not optional here.
+      - name: Install create-dmg
+        working-directory: .
+        run: npm install --global create-dmg
+
+      - name: Build Beam.app
+        run: |
+          wails build -trimpath -clean -platform darwin/universal -ldflags "$LDFLAGS"
+          test -d "$APP" || { echo "::error::$APP not found after the build"; exit 1; }
+
+      # build.sh only warns here; in CI a bundle without the relay would ship
+      # a build that can never update itself, so it is fatal.
+      - name: Build beam-relay (universal) into the bundle
+        run: |
+          GOOS=darwin GOARCH=amd64 go build -trimpath -ldflags "-X main.variant=release" -o "$RUNNER_TEMP/relay-amd64" ./cmd/beam-relay
+          GOOS=darwin GOARCH=arm64 go build -trimpath -ldflags "-X main.variant=release" -o "$RUNNER_TEMP/relay-arm64" ./cmd/beam-relay
+          lipo -create -output "$APP/Contents/MacOS/beam-relay" "$RUNNER_TEMP/relay-amd64" "$RUNNER_TEMP/relay-arm64"
+          chmod +x "$APP/Contents/MacOS/beam-relay"
+          for bin in "$APP/Contents/MacOS/"*; do
+            archs="$(lipo -archs "$bin")"
+            echo "$(basename "$bin"): $archs"
+            [[ "$archs" == *x86_64* && "$archs" == *arm64* ]] || { echo "::error::$bin is not universal"; exit 1; }
+          done
+
+      - name: Ad-hoc codesign
+        run: |
+          codesign --force --deep --sign - "$APP"
+          codesign --verify --deep --strict "$APP"
+
+      # The OTA payload on macOS is the zipped bundle; beam-relay swaps it in.
+      - name: Beam.zip
+        run: ditto -c -k --keepParent "$APP" build/bin/Beam.zip
+
+      - name: DMG
+        run: |
+          rm -f build/bin/*.dmg
+          create-dmg --overwrite --no-code-sign "$APP" build/bin
+          DMG="$(ls -t build/bin/*.dmg 2>/dev/null | head -1)"
+          test -n "$DMG" || { echo "::error::create-dmg produced no .dmg"; exit 1; }
+          echo "DMG=$DMG" >> "$GITHUB_ENV"
+
+      - name: Collect
+        run: |
+          mkdir -p ../out/ota ../out/dist
+          cp build/bin/Beam.zip ../out/ota/Beam.zip
+          cp "$DMG" "../out/dist/Beam-${VERSION}-macos-universal.dmg"
+          ls -la ../out/*
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: darwin-universal
+          path: out/
+          if-no-files-found: error
+
+  # ---------------------------------------------------------------- Publish
+  # All files go into a DRAFT release v{version}; clients see nothing until
+  # the very last step publishes it (the proxy ignores drafts).
+  publish:
+    needs: [prepare, windows, linux, macos]
+    if: needs.prepare.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    environment: ota
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ needs.prepare.outputs.version }}
+      CHANNEL: ${{ needs.prepare.outputs.channel }}
+      GH_TOKEN: ${{ github.token }}
+    defaults:
+      run:
+        working-directory: beam-desktop
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: beam-desktop
+      - uses: ./beam-desktop/.github/actions/workspace
+        with:
+          token: ${{ env.REPOS_TOKEN }}
+          bridge-ref: ${{ inputs.bridge_ref || 'main' }}
+          tun-ref: ${{ inputs.tun_ref || 'main' }}
+          core-ref: ${{ inputs.core_ref || 'main' }}
+          wails: 'false'
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Prepare beam-ota and the key
+        env:
+          KEY: ${{ secrets.BEAM_OTA_SIGNING_KEY }}
+        run: |
+          go build -trimpath -o "$RUNNER_TEMP/beam-ota" ./cmd/beam-ota
+          umask 077
+          printf '%s\n' "$KEY" > "$RUNNER_TEMP/ota.key"
+          echo "BEAM_OTA_KEY=$RUNNER_TEMP/ota.key" >> "$GITHUB_ENV"
+
+      - name: Upload to the draft release
+        env:
+          MANDATORY: ${{ inputs.mandatory }}
+          MIN_SUPPORTED: ${{ inputs.min_supported }}
+        run: |
+          A=../artifacts
+          COMMON=(-version "$VERSION" -channel "$CHANNEL" -upload)
+          [ "$MANDATORY" = "true" ] && COMMON+=(-mandatory)
+          [ -n "$MIN_SUPPORTED" ] && COMMON+=(-min-supported "$MIN_SUPPORTED")
+          for lang in ru en; do
+            f="release-notes/$VERSION.$lang.txt"
+            if [ -f "$f" ]; then
+              [ $lang = ru ] && COMMON+=(-notes "$f") || COMMON+=(-notes-en "$f")
+            else
+              echo "::warning::$f not found - no $lang changelog in the update dialog"
+            fi
+          done
+
+          "$RUNNER_TEMP/beam-ota" publish "${COMMON[@]}" -target windows-amd64 \
+            -file Beam.exe=$A/windows-amd64/ota/Beam.exe -file BeamRelay.exe=$A/windows-amd64/ota/BeamRelay.exe
+          # Installed as 'beam' by scripts/linux/install.sh.
+          "$RUNNER_TEMP/beam-ota" publish "${COMMON[@]}" -target linux-amd64 \
+            -file beam=$A/linux-amd64/ota/Beam
+          "$RUNNER_TEMP/beam-ota" publish "${COMMON[@]}" -target darwin-universal \
+            -file Beam.zip=$A/darwin-universal/ota/Beam.zip
+
+          "$RUNNER_TEMP/beam-ota" verify -staged "build/ota/$VERSION" -channel "$CHANNEL" \
+            -target windows-amd64,linux-amd64,darwin-universal
+
+      - name: Upload installers
+        run: gh release upload "v$VERSION" ../artifacts/*/dist/* --clobber
+
+      - name: Go live
+        run: |
+          ARGS=(--draft=false)
+          [ "$CHANNEL" = "stable" ] && ARGS+=(--latest)
+          gh release edit "v$VERSION" "${ARGS[@]}"
+          echo "Published v$VERSION ($CHANNEL)" >> "$GITHUB_STEP_SUMMARY"
+
+      # Reads the live feed through the proxy exactly like the app does.
+      - name: Verify the live feed
+        if: vars.OTA_PROXY_READY == 'true'
+        run: |
+          sleep 65 # the proxy caches the release list for 60 s
+          "$RUNNER_TEMP/beam-ota" verify -channel "$CHANNEL" -target windows-amd64,linux-amd64,darwin-universal
+
+      - name: Remove the key
+        if: always()
+        working-directory: .
+        run: rm -f "$RUNNER_TEMP/ota.key"

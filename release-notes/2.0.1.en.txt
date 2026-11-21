@@ -1,0 +1,9 @@
+# 2.0.1
+- Server chains: traffic can now be routed through another server in case the main one isn't working
+- DNS from profile: BEAM can now use the DNS servers provided by your VPN provider
+- Hysteria2: you can now connect to servers with a self-signed certificate or none at all; BEAM will warn you that this is insecure
+- Ping results now appear as soon as they arrive instead of after the whole measurement finishes
+- Fixed a bug where BEAM showed a black window instead of its interface
+- Country flags no longer need an internet connection
+- Fixed auto-connect on Wi-Fi: BEAM previously could not create the adapter automatically and you had to reconnect manually
+- Configurations and analytics: the UI was slightly adapted to Material 3 guidelines

@@ -1,0 +1,92 @@
+name: Beam workspace
+description: >
+  Lays out beam-development the way go.mod expects it (beam-desktop next to
+  beam-bridge, beam-tun and xray-core-beam - see the replace directives),
+  then installs Go (version from go.mod), Bun and the Wails CLI pinned to the
+  wails/v2 version in go.mod. Run actions/checkout with path: beam-desktop first.
+
+inputs:
+  token:
+    description: Token that can read the private sibling repositories
+    required: true
+  bridge-ref:
+    description: beam-bridge branch, tag or SHA
+    default: main
+  tun-ref:
+    description: beam-tun branch, tag or SHA
+    default: main
+  core-ref:
+    description: xray-core-beam branch, tag or SHA
+    default: main
+  wails:
+    description: Install Bun and the Wails CLI (not needed for publishing)
+    default: 'true'
+
+runs:
+  using: composite
+  steps:
+    - name: Check the token
+      shell: bash
+      env:
+        TOKEN: ${{ inputs.token }}
+      run: |
+        if [ -z "$TOKEN" ]; then
+          echo "::error::Secret BEAM_REPOS_TOKEN is not set: a fine-grained token with Contents: read on beam-bridge, beam-tun and xray-core-beam."
+          exit 1
+        fi
+
+    - name: Checkout beam-bridge
+      uses: actions/checkout@v4
+      with:
+        repository: AcelateOrg/beam-bridge
+        ref: ${{ inputs.bridge-ref }}
+        token: ${{ inputs.token }}
+        path: beam-bridge
+
+    - name: Checkout beam-tun
+      uses: actions/checkout@v4
+      with:
+        repository: AcelateOrg/beam-tun
+        ref: ${{ inputs.tun-ref }}
+        token: ${{ inputs.token }}
+        path: beam-tun
+
+    - name: Checkout xray-core-beam
+      uses: actions/checkout@v4
+      with:
+        repository: AcelateOrg/xray-core-beam
+        ref: ${{ inputs.core-ref }}
+        token: ${{ inputs.token }}
+        path: xray-core-beam
+
+    - name: Record sibling commits
+      shell: bash
+      run: |
+        for repo in beam-desktop beam-bridge beam-tun xray-core-beam; do
+          echo "$repo $(git -C "$repo" rev-parse HEAD)"
+        done | tee -a "$GITHUB_STEP_SUMMARY"
+
+    - uses: actions/setup-go@v5
+      with:
+        go-version-file: beam-desktop/go.mod
+        cache-dependency-path: |
+          beam-desktop/go.sum
+          beam-bridge/go.sum
+          beam-tun/go.sum
+          xray-core-beam/go.sum
+
+    - if: inputs.wails == 'true'
+      uses: oven-sh/setup-bun@v2
+
+    - name: Install Wails CLI
+      if: inputs.wails == 'true'
+      shell: bash
+      run: |
+        WAILS_VERSION="$(awk '$1 == "github.com/wailsapp/wails/v2" { print $2; exit }' beam-desktop/go.mod)"
+        if [ -z "$WAILS_VERSION" ]; then
+          echo "::error::cannot find github.com/wailsapp/wails/v2 in beam-desktop/go.mod"
+          exit 1
+        fi
+        echo "Wails $WAILS_VERSION"
+        go install "github.com/wailsapp/wails/v2/cmd/wails@${WAILS_VERSION}"
+        echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"

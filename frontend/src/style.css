@@ -1,0 +1,1333 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "./themes/index.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@font-face {
+    font-display: swap;
+    font-family: 'Rubik';
+    font-style: normal;
+    font-weight: 100;
+    src: url('../public/rubik.woff2') format('woff2');
+}
+
+@font-face {
+    font-display: swap;
+    font-family: 'Manrope';
+    font-style: normal;
+    font-weight: 400;
+    src: url('../public/manrope.woff2') format('woff2');
+}
+
+@font-face {
+    font-display: swap;
+    font-family: 'Manrope';
+    font-style: normal;
+    font-weight: 600;
+    src: url('../public/manrope_600.woff2') format('woff2');
+}
+
+@font-face {
+    font-display: swap;
+    font-family: 'Geologica';
+    font-style: normal;
+    font-weight: 100 900;
+    src: url('../public/geologica.woff2') format('woff2');
+}
+
+@font-face {
+    font-display: swap;
+    font-family: 'Onest';
+    font-style: normal;
+    font-weight: 100 900;
+    src: url('../public/onest.woff2') format('woff2');
+}
+
+@font-face {
+    font-display: swap;
+    font-family: 'Nunito';
+    font-style: normal;
+    font-weight: 200 1000;
+    src: url('../public/nunito-latin.woff2') format('woff2');
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+    font-display: swap;
+    font-family: 'Nunito';
+    font-style: normal;
+    font-weight: 200 1000;
+    src: url('../public/nunito-cyrillic.woff2') format('woff2');
+    unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+
+/* Арабская графика для фарси. Ни один из шрифтов интерфейса её не содержит,
+   поэтому Vazirmatn стоит в каждом стеке после основного шрифта: браузер берёт
+   из него только глифы из unicode-range и грузит файл, лишь когда они есть. */
+@font-face {
+    font-display: swap;
+    font-family: 'Vazirmatn';
+    font-style: normal;
+    font-weight: 100 900;
+    src: url('../public/vazirmatn-arabic.woff2') format('woff2');
+    unicode-range: U+0600-06FF,U+0750-077F,U+0870-088E,U+0890-0891,U+0897-08E1,U+08E3-08FF,U+200C-200E,U+2010-2011,U+204F,U+2E41,U+FB50-FDFF,U+FE70-FE74,U+FE76-FEFC,U+102E0-102FB,U+10E60-10E7E,U+10EC2-10EC4,U+10EFC-10EFF,U+1EE00-1EE03,U+1EE05-1EE1F,U+1EE21-1EE22,U+1EE24,U+1EE27,U+1EE29-1EE32,U+1EE34-1EE37,U+1EE39,U+1EE3B,U+1EE42,U+1EE47,U+1EE49,U+1EE4B,U+1EE4D-1EE4F,U+1EE51-1EE52,U+1EE54,U+1EE57,U+1EE59,U+1EE5B,U+1EE5D,U+1EE5F,U+1EE61-1EE62,U+1EE64,U+1EE67-1EE6A,U+1EE6C-1EE72,U+1EE74-1EE77,U+1EE79-1EE7C,U+1EE7E,U+1EE80-1EE89,U+1EE8B-1EE9B,U+1EEA1-1EEA3,U+1EEA5-1EEA9,U+1EEAB-1EEBB,U+1EEF0-1EEF1;
+}
+
+html[data-font="manrope"]   { font-family: 'Manrope', 'Vazirmatn', sans-serif; }
+html[data-font="nunito"]    { font-family: 'Nunito', 'Vazirmatn', sans-serif; }
+/* Свой шрифт: @font-face и --beam-custom-font задаёт useAppearance. */
+html[data-font="custom"]    { font-family: var(--beam-custom-font, Rubik), Rubik, 'Vazirmatn', sans-serif; }
+html[data-font="geologica"] { font-family: 'Geologica', 'Vazirmatn', sans-serif; }
+html[data-font="onest"]     { font-family: 'Onest', 'Vazirmatn', sans-serif; }
+
+html[data-radius="small"]  { --radius: 0.25rem; }
+html[data-radius="medium"] { --radius: 0.75rem; }
+html[data-radius="large"]  { --radius: 0.9375rem; }
+html[data-radius="round"]  { --radius: 1.25rem; }
+
+html[data-animation="fade"] .page-transition-content {
+    animation: page-enter-fade 220ms ease-out both;
+}
+
+html[data-animation="slide-up"] .page-transition-content {
+    animation: page-enter-slide-up 300ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+html[data-animation="none"] .page-transition-content {
+    animation: none;
+}
+
+/* stagger-list/animate-list-item (Профили, Настройки) — отдельная от
+   page-transition анимация появления пунктов списка, раньше не гасилась
+   этим тумблером вообще (выключалась только системным prefers-reduced-motion). */
+html[data-animation="none"] .animate-list-item,
+html[data-animation="none"] .animate-fade-up {
+    animation: none;
+    opacity: 1;
+    transform: none;
+}
+
+/* Пункты списков внутри страниц иначе выезжают снизу, даже когда выбран «Фейд». */
+html[data-animation="fade"] .animate-list-item,
+html[data-animation="fade"] .animate-fade-up {
+    animation-name: page-enter-fade;
+    animation-duration: 220ms;
+    animation-timing-function: ease-out;
+}
+
+/* То же для slide-in-from-* (tailwind-animate) внутри страниц; порталы (меню, диалоги) вне .page-transition-content не затрагиваются. */
+html[data-animation="fade"] .page-transition-content .animate-in {
+    --tw-enter-translate-x: 0;
+    --tw-enter-translate-y: 0;
+}
+
+@keyframes page-enter-fade {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+@keyframes page-enter-slide-up {
+    from { opacity: 0; transform: translate3d(0, 14px, 0) scale(0.993); }
+    to   { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+}
+
+:root {
+    --radius: 0.75rem;
+    /* Радиус подложки страницы (то же, что Tailwind rounded-xl == --radius-xl)
+       и размер косметических уголков в стыке хедера, сайдбара и подложки.
+       Одна переменная на оба места, иначе уголок перестаёт совпадать при
+       смене «Скругления» во «Внешнем виде». */
+    --layout-corner-radius: min(calc(var(--radius) * 4 / 3), calc(var(--radius) + 6px));
+    --connect-btn-size: clamp(15rem, 30vh, 20rem);
+    --titlebar-height: 1.75rem;
+    /* 1 в LTR, -1 в RTL: зеркалит горизонтальные сдвиги в анимациях. */
+    --dir-sign: 1;
+    --stat-badge-height: 2.25rem;
+
+    font-family: Rubik, 'Vazirmatn', sans-serif;
+    user-select: none;
+}
+
+/* Специфичнее :root, поэтому медиазапросы ниже не сбрасывают знак. */
+:root[dir="rtl"] {
+    --dir-sign: -1;
+}
+
+@media (max-height: 650px) {
+    :root {
+        --connect-btn-size: 14.5rem;
+        --titlebar-height: 1.75rem;
+        --stat-badge-height: 1.75rem;
+    }
+}
+
+@media (max-width: 500px) {
+    :root {
+        /* Мини-окно: кнопка ужимается по высоте и ширине окна. */
+        --connect-btn-size: clamp(10rem, min(30vh, 55vw), 13.5rem);
+    }
+}
+
+@theme inline {
+    --color-background: var(--background);
+    --color-foreground: var(--foreground);
+    --color-card: var(--card);
+    --color-card-foreground: var(--card-foreground);
+    --color-popover: var(--popover);
+    --color-popover-foreground: var(--popover-foreground);
+    --color-primary: var(--primary);
+    --color-primary-foreground: var(--primary-foreground);
+    --color-secondary: var(--secondary);
+    --color-secondary-foreground: var(--secondary-foreground);
+    --color-muted: var(--muted);
+    --color-muted-foreground: var(--muted-foreground);
+    --color-accent: var(--accent);
+    --color-accent-foreground: var(--accent-foreground);
+    --color-destructive: var(--destructive);
+    --color-destructive-foreground: var(--destructive-foreground);
+    --color-border: var(--border);
+    --color-input: var(--input);
+    --color-ring: var(--ring);
+    --color-sidebar: var(--sidebar);
+    --color-sidebar-foreground: var(--sidebar-foreground);
+    --color-sidebar-primary: var(--sidebar-primary);
+    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+    --color-sidebar-accent: var(--sidebar-accent);
+    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+    --color-sidebar-border: var(--sidebar-border);
+    --color-sidebar-ring: var(--sidebar-ring);
+    --color-chart-1: var(--chart-1);
+    --color-chart-2: var(--chart-2);
+    --color-chart-3: var(--chart-3);
+    --color-chart-4: var(--chart-4);
+    --color-chart-5: var(--chart-5);
+    /* Вся шкала — пропорция от --radius: при любом выборе sm < md < lg < xl < 2xl,
+       мелкие элементы не становятся острыми. На «Среднем» (12px) — как раньше. */
+    --radius-sm: calc(var(--radius) * 2 / 3);
+    --radius-md: calc(var(--radius) * 5 / 6);
+    --radius-lg: var(--radius);
+    /* Крупные ступени растут медленнее (min), иначе на «Круглом» карточки становятся пилюлями. */
+    --radius-xl: min(calc(var(--radius) * 4 / 3), calc(var(--radius) + 6px));
+    --radius-2xl: min(calc(var(--radius) * 1.5), calc(var(--radius) + 8px));
+    --radius-3xl: min(calc(var(--radius) * 2), calc(var(--radius) + 12px));
+    --radius-4xl: min(calc(var(--radius) * 8 / 3), calc(var(--radius) + 20px));
+}
+
+/* Фон-картинка (см. themes/backdrop.ts, BackdropLayer). Вне @layer, чтобы перебить
+   утилиты Tailwind. Холст заливается плотным фоном темы, body прозрачен — иначе
+   его фон лёг бы поверх слоя с z-index: -10. */
+html[data-backdrop] {
+    background-color: var(--background);
+    /* Холст ProTun (инлайн-фон React Flow) — прозрачный, фон даёт панель страницы. */
+    --protun-canvas: transparent;
+}
+
+html[data-backdrop] body,
+html[data-backdrop] .app-backdrop-clear,
+html[data-backdrop] [data-slot="sidebar-inner"] {
+    background-color: transparent;
+}
+
+/* Полупрозрачный сайдбар заливает только обёртка (bg-sidebar у inset-варианта):
+   внутренняя панель, тайтлбар и подложка панели страницы иначе накладывают
+   тот же цвет вторым слоем и панель «плавает» с видимой рамкой вокруг. */
+
+/* Цвета сайдбара и панели страницы считает backdrop.ts из стиля и плотности;
+   запасные значения — стиль «Стеклянное меню» до загрузки JS. */
+html[data-backdrop] [data-slot="sidebar-wrapper"] {
+    background-color: var(--backdrop-sidebar-bg, color-mix(in oklch, var(--background) 18%, transparent));
+}
+
+html[data-backdrop] .app-backdrop-surface {
+    background-color: var(--backdrop-content-bg, color-mix(in oklch, var(--background) 74%, transparent));
+    box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--foreground) 7%, transparent);
+    /* В режиме фона панель «плавает» — скругляем все четыре угла. */
+    border-radius: var(--layout-corner-radius);
+    clip-path: inset(0 round var(--layout-corner-radius));
+}
+
+@layer base {
+    html,
+    body,
+    #root {
+        width: 100%;
+        height: 100%;
+    }
+
+    * {
+        @apply border-border outline-ring/50;
+        -webkit-user-drag: none;    /* <-- добавить */
+        user-drag: none;            /* <-- добавить */
+    }
+
+    body {
+        @apply bg-background text-foreground transition-colors duration-300;
+        font-feature-settings: "rlig" 1, "calt" 1;
+        color-scheme: light;
+        --wails-draggable: no-drag;  /* <-- добавить */
+    }
+
+    .dark body {
+        color-scheme: dark;
+    }
+
+    a,
+    button,
+    input,
+    textarea,
+    select,
+    [role="button"],
+    [data-slot="card"],
+    [data-slot="item"],
+    [data-slot="sidebar-menu-button"] {
+        transition-duration: 180ms;
+        transition-property: color, background-color, border-color, box-shadow, opacity, transform;
+        transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+    }
+}
+
+.page-transition-shell {
+    height: 100%;
+    overflow: hidden;
+    isolation: isolate;
+}
+
+.page-transition-content {
+    height: 100%;
+    animation: page-enter 300ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.onboarding-step {
+    will-change: opacity, transform;
+}
+
+.onboarding-step-forward {
+    animation: onboarding-step-forward 360ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.onboarding-step-back {
+    animation: onboarding-step-back 360ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.onboarding-step-swap {
+    animation: onboarding-step-swap 240ms ease-out;
+}
+
+.onboarding-wizard-exit {
+    animation: onboarding-wizard-exit 520ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    pointer-events: none;
+}
+
+.onboarding-finale {
+    position: absolute;
+    inset: var(--titlebar-height) 0 0;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    opacity: 0;
+}
+
+.onboarding-finale-trace,
+.onboarding-finale-solid {
+    opacity: 1;
+}
+
+.beam-finale-logo {
+    position: relative;
+    width: min(320px, 72vw);
+    aspect-ratio: 776 / 154;
+}
+
+.beam-finale-trace-logo,
+.beam-finale-solid-logo {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+}
+
+.beam-finale-solid {
+    --beam-glow-room: 28px;
+    position: absolute;
+    inset: calc(var(--beam-glow-room) * -1);
+}
+
+/* Явные размеры, а не width: auto: <img> при auto берёт собственный размер
+   и не растягивается по inset. */
+.beam-finale-solid .beam-finale-solid-logo {
+    inset: var(--beam-glow-room);
+    width: calc(100% - var(--beam-glow-room) * 2);
+    height: calc(100% - var(--beam-glow-room) * 2);
+}
+
+.beam-finale-solid-file {
+    display: none;
+}
+
+.dark .beam-finale-solid-file {
+    display: block;
+}
+
+.dark .beam-finale-solid-vector {
+    display: none;
+}
+
+.beam-finale-trace-logo,
+.beam-finale-solid {
+    opacity: 0;
+}
+
+.onboarding-finale-trace .beam-finale-trace-logo {
+    opacity: 1;
+}
+
+/* Хореография финала.
+   trace: звезда вкатывается справа налево и встаёт на место с лёгким
+          перекатом; буквы поднимаются и дорисовываются у неё за спиной,
+          от M к B, по обводке бежит волна градиента.
+   solid: звезда пульсирует, и от неё вправо по буквам прокатывается заливка
+          со вспышкой свечения; логотип чуть «вдыхает» и оседает, затем уходит
+          вперёд с размытием. Длительности фаз задаёт playCompletionTransition. */
+.onboarding-finale-solid .beam-finale-trace-logo {
+    animation: beam-trace-fade-out 380ms cubic-bezier(0.4, 0, 0.2, 1) 520ms both;
+}
+
+.onboarding-finale-solid .beam-finale-logo {
+    animation: beam-logo-exit 420ms cubic-bezier(0.55, 0, 1, 0.45) 1360ms both;
+}
+
+/* Маска шире логотипа в 3 раза: её размытый край проезжает по буквам.
+   filter идёт до маски, так что свечение катится той же волной. */
+.onboarding-finale-solid .beam-finale-solid {
+    --beam-glow: rgb(0 200 255 / 0.55);
+    -webkit-mask-image: linear-gradient(90deg, #000 40%, transparent 60%);
+    mask-image: linear-gradient(90deg, #000 40%, transparent 60%);
+    -webkit-mask-size: 300% 100%;
+    mask-size: 300% 100%;
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    animation:
+        beam-solid-sweep 680ms cubic-bezier(0.65, 0, 0.35, 1) 150ms both,
+        beam-solid-reveal 1500ms linear both;
+}
+
+/* Звезда стартует за правым краем логотипа, поэтому svg не обрезает выход за viewBox. */
+.beam-finale-trace-logo {
+    overflow: visible;
+}
+
+.beam-finale-line {
+    fill: none;
+    stroke: url(#beamTraceGradient);
+    stroke-width: 3.2;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+    opacity: 0;
+    transform-box: fill-box;
+    transform-origin: 50% 100%;
+    animation:
+        beam-outline-draw 950ms cubic-bezier(0.16, 1, 0.3, 1) var(--beam-delay, 0ms) both,
+        beam-letter-rise 900ms cubic-bezier(0.22, 1.25, 0.36, 1) var(--beam-delay, 0ms) both;
+}
+
+.beam-finale-line-accent {
+    stroke: #00c8ff;
+    stroke-width: 3.6;
+    transform-origin: center;
+    animation:
+        beam-outline-draw 700ms cubic-bezier(0.33, 0, 0.2, 1) both,
+        beam-star-roll 1300ms linear both;
+}
+
+/* Анимации заменяют друг друга целиком, поэтому конечное состояние отрисовки
+   задано явно, иначе звезда пропала бы на время пульса. */
+.onboarding-finale-solid .beam-finale-line-accent {
+    opacity: 1;
+    stroke-dashoffset: 0;
+    animation: beam-star-pulse 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.beam-trace-stop-base {
+    stop-color: color-mix(in oklab, var(--foreground) 70%, transparent);
+}
+
+.beam-trace-stop-accent {
+    stop-color: #00c8ff;
+}
+
+/* На светлом фоне светлый блик волны теряется, там он темнее основного голубого. */
+.beam-trace-stop-highlight {
+    stop-color: #0092c4;
+}
+
+.dark .beam-trace-stop-highlight {
+    stop-color: #c4f3ff;
+}
+
+.dark .onboarding-finale-solid .beam-finale-solid {
+    --beam-glow: rgb(0 200 255 / 0.65);
+}
+
+:root:not(.dark) .onboarding-finale-solid .beam-finale-solid {
+    --beam-glow: rgb(0 180 240 / 0.32);
+}
+
+.beam-finale-fill-text {
+    fill: var(--foreground);
+}
+
+.beam-finale-fill-accent {
+    fill: #00c8ff;
+}
+
+.app-layout-onboarding-enter {
+    animation: app-layout-onboarding-enter 820ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.connect-connected-bump {
+    animation: connect-bump 760ms cubic-bezier(0.16, 1, 0.3, 1) both;
+    transform-origin: center;
+}
+
+.connect-connected-glow {
+    animation: connect-glow-pop 760ms cubic-bezier(0.16, 1, 0.3, 1) both;
+    transform-origin: center;
+}
+
+.connection-stats-shell {
+    max-height: 0;
+    overflow: hidden;
+    padding-top: 0;
+    opacity: 0;
+    transform: translate3d(0, 8px, 0);
+    will-change: max-height, padding-top, opacity, transform;
+}
+
+.connection-stats-shell-enter {
+    animation: connection-stats-shell-in 680ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.connection-stats-shell-exit {
+    animation: connection-stats-shell-out 780ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+.connection-stat-item {
+    opacity: 0;
+    transform: translate3d(0, 10px, 0) scale(0.98);
+    will-change: opacity, transform;
+}
+
+.connection-stat-item-enter {
+    animation: connection-stat-fade-up 520ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.connection-stat-item-exit {
+    animation: connection-stat-fade-down 420ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+.connection-stat-divider {
+    opacity: 0;
+}
+
+.connection-stat-divider-enter {
+    animation: connection-stat-divider-in 360ms ease-out forwards;
+}
+
+.connection-stat-divider-exit {
+    animation: connection-stat-divider-out 260ms ease-out forwards;
+}
+
+@keyframes page-enter {
+    from {
+        opacity: 0;
+        transform: translate3d(calc(10px * var(--dir-sign)), 0, 0) scale(0.993);
+    }
+
+    to {
+        opacity: 1;
+        transform: translate3d(0, 0, 0) scale(1);
+    }
+}
+
+/* ─── iOS-feel stagger entries ──────────────────────────────── */
+
+.animate-list-item {
+    animation: list-item-enter 400ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes list-item-enter {
+    from {
+        opacity: 0;
+        transform: translate3d(0, 14px, 0) scale(0.985);
+    }
+    to {
+        opacity: 1;
+        transform: translate3d(0, 0, 0) scale(1);
+    }
+}
+
+.stagger-list > .animate-list-item:nth-child(1)   { animation-delay: 30ms; }
+.stagger-list > .animate-list-item:nth-child(2)   { animation-delay: 70ms; }
+.stagger-list > .animate-list-item:nth-child(3)   { animation-delay: 110ms; }
+.stagger-list > .animate-list-item:nth-child(4)   { animation-delay: 150ms; }
+.stagger-list > .animate-list-item:nth-child(5)   { animation-delay: 190ms; }
+.stagger-list > .animate-list-item:nth-child(6)   { animation-delay: 230ms; }
+.stagger-list > .animate-list-item:nth-child(7)   { animation-delay: 270ms; }
+.stagger-list > .animate-list-item:nth-child(n+8) { animation-delay: 310ms; }
+
+.animate-fade-up {
+    animation: fade-up-gentle 380ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes fade-up-gentle {
+    from {
+        opacity: 0;
+        transform: translate3d(0, 10px, 0);
+    }
+    to {
+        opacity: 1;
+        transform: translate3d(0, 0, 0);
+    }
+}
+
+@keyframes onboarding-step-forward {
+    from {
+        opacity: 0;
+        transform: translate3d(calc(18px * var(--dir-sign)), 0, 0);
+    }
+
+    to {
+        opacity: 1;
+        transform: translate3d(0, 0, 0);
+    }
+}
+
+@keyframes onboarding-step-back {
+    from {
+        opacity: 0;
+        transform: translate3d(calc(-18px * var(--dir-sign)), 0, 0);
+    }
+
+    to {
+        opacity: 1;
+        transform: translate3d(0, 0, 0);
+    }
+}
+
+@keyframes onboarding-step-swap {
+    from { opacity: 0.35; }
+    to   { opacity: 1; }
+}
+
+@keyframes onboarding-wizard-exit {
+    from {
+        opacity: 1;
+        transform: translate3d(0, 0, 0) scale(1);
+    }
+
+    to {
+        opacity: 0;
+        transform: translate3d(0, 8px, 0) scale(0.992);
+    }
+}
+
+@keyframes beam-outline-draw {
+    0% {
+        opacity: 0;
+        stroke-dashoffset: 1;
+    }
+
+    10% {
+        opacity: 1;
+    }
+
+    100% {
+        opacity: 1;
+        stroke-dashoffset: 0;
+    }
+}
+
+/* Прокат: путь 654 единицы viewBox при радиусе звезды 76 даёт ~493° поворота,
+   так что звезда катится, а не скользит. Сдвиг и поворот в одних кадрах с одной
+   кривой, иначе вращение разойдётся с движением. Длина в px внутри SVG равна
+   единицам viewBox. Задержки букв в Onboarding.tsx завязаны на эту кривую. */
+@keyframes beam-star-roll {
+    0% {
+        transform: translateX(640px) rotate(493deg);
+        animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    84% {
+        transform: translateX(-14px) rotate(-10deg);
+        animation-timing-function: cubic-bezier(0.45, 0, 0.55, 1);
+    }
+
+    100% {
+        transform: translateX(0) rotate(0deg);
+    }
+}
+
+@keyframes beam-letter-rise {
+    0% {
+        transform: translateY(16px) scale(0.94);
+    }
+
+    100% {
+        transform: translateY(0) scale(1);
+    }
+}
+
+@keyframes beam-star-pulse {
+    0% {
+        transform: scale(1) rotate(0deg);
+    }
+
+    35% {
+        transform: scale(1.22) rotate(18deg);
+    }
+
+    100% {
+        transform: scale(1) rotate(0deg);
+    }
+}
+
+@keyframes beam-trace-fade-out {
+    from {
+        opacity: 1;
+    }
+
+    to {
+        opacity: 0;
+    }
+}
+
+@keyframes beam-solid-sweep {
+    from {
+        -webkit-mask-position: 100% 0;
+        mask-position: 100% 0;
+    }
+
+    to {
+        -webkit-mask-position: 0% 0;
+        mask-position: 0% 0;
+    }
+}
+
+/* Быстрая атака свечения вместе с волной и долгое затухание. Набор функций
+   filter одинаковый на всех шагах, иначе браузер не интерполирует и прыгает. */
+@keyframes beam-solid-reveal {
+    0% {
+        opacity: 1;
+        transform: scale(0.985);
+        filter: brightness(1) drop-shadow(0 0 0 transparent);
+        animation-timing-function: cubic-bezier(0.4, 0, 0.6, 1);
+    }
+
+    12% {
+        transform: scale(0.985);
+        filter: brightness(1) drop-shadow(0 0 0 transparent);
+        animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    42% {
+        transform: scale(1.014);
+        filter: brightness(1.2) drop-shadow(0 0 16px var(--beam-glow));
+        animation-timing-function: cubic-bezier(0.33, 0, 0.2, 1);
+    }
+
+    100% {
+        opacity: 1;
+        transform: scale(1);
+        filter: brightness(1) drop-shadow(0 0 3px color-mix(in srgb, var(--beam-glow) 30%, transparent));
+    }
+}
+
+@keyframes beam-logo-exit {
+    from {
+        opacity: 1;
+        transform: scale(1);
+        filter: blur(0);
+    }
+
+    to {
+        opacity: 0;
+        transform: scale(1.045);
+        filter: blur(6px);
+    }
+}
+
+@keyframes app-layout-onboarding-enter {
+    from {
+        opacity: 0;
+        transform: scale(0.995);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+@keyframes shimmer {
+    0%   { transform: translateX(calc(-150% * var(--dir-sign))); }
+    100% { transform: translateX(calc(250% * var(--dir-sign)));  }
+}
+
+@keyframes connect-bump {
+    0% {
+        transform: scale(1);
+    }
+
+    44% {
+        transform: scale(1.115);
+    }
+
+    68% {
+        transform: scale(0.985);
+    }
+
+    84% {
+        transform: scale(1.018);
+    }
+
+    100% {
+        transform: scale(1);
+    }
+}
+
+@keyframes connect-glow-pop {
+    0% {
+        opacity: 0.46;
+        transform: scale(1);
+    }
+
+    44% {
+        opacity: 0.78;
+        transform: scale(1.12);
+    }
+
+    100% {
+        opacity: 0.5;
+        transform: scale(1);
+    }
+}
+
+@keyframes connection-stats-shell-in {
+    0% {
+        max-height: 0;
+        padding-top: 0;
+        opacity: 0;
+        transform: translate3d(0, 8px, 0);
+    }
+
+    100% {
+        max-height: 5.5rem;
+        padding-top: 1rem;
+        opacity: 1;
+        transform: translate3d(0, 0, 0);
+    }
+}
+
+@keyframes connection-stats-shell-out {
+    0% {
+        max-height: 5.5rem;
+        padding-top: 1rem;
+        opacity: 1;
+        transform: translate3d(0, 0, 0);
+    }
+
+    28% {
+        max-height: 5.5rem;
+        padding-top: 1rem;
+        opacity: 1;
+        transform: translate3d(0, 0, 0);
+    }
+
+    100% {
+        max-height: 0;
+        padding-top: 0;
+        opacity: 0;
+        transform: translate3d(0, 10px, 0);
+    }
+}
+
+@keyframes connection-stat-fade-up {
+    0% {
+        opacity: 0;
+        transform: translate3d(0, 10px, 0) scale(0.98);
+    }
+
+    100% {
+        opacity: 1;
+        transform: translate3d(0, 0, 0) scale(1);
+    }
+}
+
+@keyframes connection-stat-divider-in {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes connection-stat-fade-down {
+    0% {
+        opacity: 1;
+        transform: translate3d(0, 0, 0) scale(1);
+    }
+
+    100% {
+        opacity: 0;
+        transform: translate3d(0, 12px, 0) scale(0.985);
+    }
+}
+
+@keyframes connection-stat-divider-out {
+    from {
+        opacity: 1;
+    }
+
+    to {
+        opacity: 0;
+    }
+}
+
+@keyframes ringPulse {
+    0%   { transform: scale(1);    opacity: 0.6; }
+    70%  { transform: scale(1.12); opacity: 0;   }
+    100% { transform: scale(1.12); opacity: 0;   }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .page-transition-content {
+        animation: none;
+    }
+
+    .onboarding-step {
+        animation: none;
+    }
+
+    .onboarding-wizard-exit,
+    .app-layout-onboarding-enter,
+    .onboarding-finale-solid .beam-finale-solid,
+    .onboarding-finale-solid .beam-finale-trace-logo,
+    .onboarding-finale-solid .beam-finale-logo,
+    .beam-finale-line,
+    .beam-finale-line-accent,
+    .onboarding-finale-solid .beam-finale-line-accent {
+        animation: none;
+    }
+
+    .onboarding-finale-trace .beam-finale-trace-logo {
+        opacity: 1;
+    }
+
+    .onboarding-finale-solid .beam-finale-solid {
+        opacity: 1;
+        -webkit-mask-image: none;
+        mask-image: none;
+    }
+
+    .onboarding-finale-solid .beam-finale-trace-logo {
+        opacity: 0;
+    }
+
+    .beam-finale-line {
+        opacity: 1;
+        stroke-dashoffset: 0;
+    }
+
+    .animate-list-item,
+    .animate-fade-up {
+        animation: none;
+        opacity: 1;
+        transform: none;
+    }
+
+    .connect-connected-bump {
+        animation: none;
+    }
+
+    .connect-connected-glow {
+        animation: none;
+    }
+
+    .connection-stats-shell {
+        animation: none;
+        max-height: 5.5rem;
+        padding-top: 1rem;
+        opacity: 1;
+        transform: none;
+    }
+
+    .connection-stats-shell-exit {
+        max-height: 0;
+        padding-top: 0;
+        opacity: 0;
+    }
+
+    .connection-stat-item,
+    .connection-stat-divider {
+        animation: none;
+        opacity: 1;
+        transform: none;
+    }
+
+    .connection-stat-item-exit,
+    .connection-stat-divider-exit {
+        opacity: 0;
+    }
+
+    a,
+    button,
+    input,
+    textarea,
+    select,
+    [role="button"],
+    [data-slot="card"],
+    [data-slot="item"],
+    [data-slot="sidebar-menu-button"] {
+        transition-duration: 0ms;
+    }
+}
+/* ProTun palette: card being placed on the canvas */
+@keyframes protun-march {
+    to {
+        stroke-dashoffset: -20;
+    }
+}
+
+.protun-march {
+    width: calc(100% - 2px);
+    height: calc(100% - 2px);
+    animation: protun-march 0.7s linear infinite;
+}
+
+@keyframes protun-land {
+    from {
+        transform: scale(1.03);
+        box-shadow: 0 0 0 3px color-mix(in oklab, var(--primary) 50%, transparent);
+    }
+
+    to {
+        transform: none;
+        box-shadow: 0 0 0 0 transparent;
+    }
+}
+
+.protun-node-land > div:not(.react-flow__handle) {
+    animation: protun-land 0.4s ease-out;
+}
+
+/* Ножницы на связи смотрят лезвиями вниз, поперёк линии. */
+.protun-cut-icon {
+    transform: rotate(-90deg);
+}
+
+/* Пока карточку тащат, бегущий пунктир связей стоит: не тратим кадры на перерисовку SVG. */
+.protun-dragging .react-flow__edge.animated path {
+    animation-play-state: paused;
+}
+
+.protun-dragging .react-flow__node {
+    transition: none !important;
+}
+
+/* Конфликт правил ProTun: карточка медленно «дышит» красным, значок — пульсирует. */
+@keyframes protun-conflict-glow {
+    0%,
+    100% {
+        box-shadow:
+            0 0 0 2px color-mix(in oklab, var(--destructive) 75%, transparent),
+            0 0 18px -2px color-mix(in oklab, var(--destructive) 45%, transparent);
+    }
+    50% {
+        box-shadow:
+            0 0 0 2px var(--destructive),
+            0 0 30px 2px color-mix(in oklab, var(--destructive) 60%, transparent);
+    }
+}
+
+.protun-conflict {
+    border-color: var(--destructive) !important;
+    animation: protun-conflict-glow 2.2s ease-in-out infinite;
+}
+
+@keyframes protun-conflict-ping {
+    0% {
+        transform: scale(1);
+        opacity: 0.55;
+    }
+    80%,
+    100% {
+        transform: scale(2.1);
+        opacity: 0;
+    }
+}
+
+.protun-conflict-ping {
+    animation: protun-conflict-ping 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+.protun-dragging .protun-conflict,
+.protun-dragging .protun-conflict-ping {
+    animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .protun-conflict,
+    .protun-conflict-ping {
+        animation: none;
+    }
+}
+
+.protun-placing-drag,
+.protun-placing-drag * {
+    cursor: grabbing !important;
+}
+
+.protun-placing-click .react-flow,
+.protun-placing-click .react-flow * {
+    cursor: copy !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .protun-march,
+    .protun-node-land > div:not(.react-flow__handle) {
+        animation: none;
+    }
+}
+
+/* Wails window drag regions */
+.wails-drag {
+    --wails-draggable: drag;
+    cursor: default;
+}
+
+/* Внутри draggable зоны — интерактивщина не тащит окно */
+.wails-drag button,
+.wails-drag input,
+.wails-drag a,
+.wails-drag select,
+.wails-drag [role="button"] {
+    --wails-draggable: no-drag;
+}
+
+/* Toasts. Sonner runs unstyled (components/ui/sonner.tsx); the whole look is
+   here and is built from theme tokens only. */
+[data-sonner-toaster] {
+    font-family: inherit;
+    --width: 22.5rem;
+}
+
+.beam-toast {
+    --toast-tone: var(--primary);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 0.5rem 0.625rem;
+    width: var(--width);
+    padding: 0.75rem 0.875rem;
+    border-radius: min(calc(var(--radius) + 6px), 1.375rem);
+    color: var(--popover-foreground);
+    background: color-mix(in oklab, var(--popover) 94%, transparent);
+    -webkit-backdrop-filter: blur(24px) saturate(1.5);
+    backdrop-filter: blur(24px) saturate(1.5);
+    box-shadow:
+        inset 0 0 0 1px color-mix(in oklab, var(--foreground) 9%, transparent),
+        0 1px 2px rgb(0 0 0 / 0.08),
+        0 12px 32px -12px rgb(0 0 0 / 0.35);
+    cursor: default;
+    user-select: none;
+}
+
+.beam-toast[data-type="success"] { --toast-tone: oklch(0.6 0.16 155); }
+.beam-toast[data-type="warning"] { --toast-tone: oklch(0.66 0.16 65); }
+.beam-toast[data-type="error"]   { --toast-tone: var(--destructive); }
+.beam-toast[data-type="loading"] { --toast-tone: var(--muted-foreground); }
+.dark .beam-toast[data-type="success"] { --toast-tone: oklch(0.79 0.17 155); }
+.dark .beam-toast[data-type="warning"] { --toast-tone: oklch(0.82 0.15 80); }
+
+.beam-toast:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+}
+
+/* Collapsed stack: only the front toast shows its content. */
+.beam-toast[data-expanded="false"][data-front="false"] > * {
+    opacity: 0;
+}
+
+.beam-toast [data-icon] {
+    position: relative;
+    display: flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 1.125rem;
+    height: 1.125rem;
+    /* Sits on the title's first line whatever the height of the toast. */
+    margin-top: 0.0625rem;
+    color: var(--toast-tone);
+}
+
+.beam-toast [data-icon] svg {
+    width: 1.125rem;
+    height: 1.125rem;
+}
+
+.beam-toast [data-content] {
+    display: flex;
+    flex: 1 1 9rem;
+    flex-direction: column;
+    gap: 0.125rem;
+    min-width: 0;
+    /* Room for the close button in the corner. */
+    padding-inline-end: 1.25rem;
+}
+
+/* Текст ошибок приходит с бэкенда по-английски. plaintext даёт каждому абзацу
+   его собственное направление, и английский в RTL-тосте не разъезжается. */
+.beam-toast [data-title],
+.beam-toast [data-description] {
+    unicode-bidi: plaintext;
+    text-align: start;
+}
+
+.beam-toast [data-title] {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    line-height: 1.25rem;
+    letter-spacing: -0.005em;
+}
+
+.beam-toast [data-description] {
+    font-size: 0.75rem;
+    line-height: 1.45;
+    color: var(--muted-foreground);
+    /* Backend errors can be a wall of text. */
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 4;
+    overflow: hidden;
+}
+
+.beam-toast [data-close-button] {
+    position: absolute;
+    top: 0.375rem;
+    inset-inline-end: 0.375rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.375rem;
+    height: 1.375rem;
+    border-radius: 9999px;
+    color: var(--muted-foreground);
+    opacity: 0;
+    cursor: pointer;
+    transition: opacity 150ms, background-color 150ms, color 150ms;
+}
+
+.beam-toast [data-close-button] svg {
+    width: 0.75rem;
+    height: 0.75rem;
+}
+
+.beam-toast:hover [data-close-button],
+.beam-toast [data-close-button]:focus-visible {
+    opacity: 1;
+}
+
+.beam-toast [data-close-button]:hover {
+    color: var(--foreground);
+    background: color-mix(in oklab, var(--foreground) 10%, transparent);
+}
+
+/* A toast with buttons is answered with them; the corner cross would sit on
+   top of the buttons in a one-line toast. */
+.beam-toast:has([data-button]) [data-close-button] {
+    display: none;
+}
+
+.beam-toast:has([data-button]) [data-content] {
+    padding-inline-end: 0;
+}
+
+.beam-toast [data-button] {
+    flex: none;
+    align-self: center;
+    height: 1.75rem;
+    padding: 0 0.75rem;
+    border-radius: min(var(--radius), 0.625rem);
+    font-size: 0.75rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 150ms, opacity 150ms, transform 100ms;
+}
+
+.beam-toast [data-button]:first-of-type {
+    margin-inline-start: auto;
+}
+
+.beam-toast [data-button]:active {
+    transform: scale(0.97);
+}
+
+.beam-toast [data-action] {
+    color: var(--primary-foreground);
+    background: var(--primary);
+}
+
+.beam-toast [data-action]:hover {
+    opacity: 0.9;
+}
+
+.beam-toast [data-cancel] {
+    color: var(--foreground);
+    background: color-mix(in oklab, var(--foreground) 8%, transparent);
+}
+
+.beam-toast [data-cancel]:hover {
+    background: color-mix(in oklab, var(--foreground) 14%, transparent);
+}
+
+.beam-toast .sonner-loader {
+    display: flex;
+}
+
+/* ─── RTL ─────────────────────────────────────────────────────────────
+   Стрелки «назад/вперёд/вглубь» в RTL смотрят в другую сторону. Через
+   transform, а не scale: Tailwind 4 пишет translate и scale в отдельные
+   свойства, так что сдвиги вроде group-hover:translate-x-* не ломаются. */
+[dir="rtl"] :is(
+    .lucide-chevron-left, .lucide-chevron-right,
+    .lucide-chevrons-left, .lucide-chevrons-right,
+    .lucide-arrow-left, .lucide-arrow-right,
+    .lucide-arrow-up-right,
+    .lucide-panel-left, .lucide-panel-right
+) {
+    transform: scaleX(-1);
+}
+
+/* Моноширинным в интерфейсе набраны только технические значения: IP, порты,
+   пинг, хэши, логи, JSON. Они всегда читаются слева направо, но выравниваются
+   как соседний текст (match-parent), иначе в RTL-карточке имя прилипает влево.
+   В base-слое, чтобы text-center/text-end из утилит побеждали. */
+@layer base {
+    [dir="rtl"] .font-mono {
+        direction: ltr;
+        unicode-bidi: isolate;
+    }
+
+    [dir="rtl"] .font-mono:not(input, textarea, pre) {
+        text-align: match-parent;
+    }
+}

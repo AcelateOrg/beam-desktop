@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <link href="/beam.png" rel="icon" type="image/png"/>
+    <title>beam-app</title>
+    <script>
+        // Ставит палитру до первой отрисовки, чтобы не было вспышки темы.
+        // Палитры генерируются в src/themes/controller.ts и кэшируются в
+        // localStorage['theme-palette']; при промахе кэша работают запасные
+        // :root / .dark из themes/light.css и themes/dark.css.
+        (function () {
+            var root = document.documentElement;
+            var preference = 'system';
+            var cache = null;
+            try {
+                preference = localStorage.getItem('theme') || 'system';
+                cache = JSON.parse(localStorage.getItem('theme-palette') || 'null');
+            } catch (e) {}
+            var systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            var resolved = preference === 'system' ? (systemDark ? 'dark' : 'light') : preference;
+            var dark = resolved !== 'light';
+            if (cache && cache.resolved === resolved && cache.vars) {
+                for (var name in cache.vars) {
+                    if (Object.prototype.hasOwnProperty.call(cache.vars, name) && name.indexOf('--') === 0) {
+                        root.style.setProperty(name, String(cache.vars[name]));
+                    }
+                }
+                dark = !!cache.dark;
+                // Фон-картинка: поверхности в кэше уже полупрозрачные.
+                if (cache.backdrop) {
+                    root.dataset.backdrop = '';
+                    try {
+                        var backdrop = JSON.parse(localStorage.getItem('beam:backdrop') || 'null');
+                        root.dataset.backdropStyle = backdrop && backdrop.style === 'sidebar' ? 'sidebar' : 'content';
+                    } catch (e) {}
+                }
+            }
+            root.classList.toggle('dark', dark);
+            root.dataset.theme = resolved;
+            root.dataset.themePreference = preference;
+            root.style.colorScheme = dark ? 'dark' : 'light';
+        })();
+    </script>
+</head>
+<body>
+<div id="root"></div>
+<script>
+    // Если бандл упал до первой отрисовки React, окно оставалось просто
+    // чёрным (фон окна). Показываем ошибку обычным HTML и пишем её в
+    // crash.log через рантайм Wails.
+    (function () {
+        var errors = [];
+        function report(text) {
+            errors.push(text);
+            try { window.runtime && window.runtime.LogError('frontend boot: ' + text); } catch (e) {}
+        }
+        function onError(event) {
+            var err = event.error || event.reason;
+            report((err && (err.stack || err.message)) || event.message || String(err));
+        }
+        window.addEventListener('error', onError);
+        window.addEventListener('unhandledrejection', onError);
+
+        // Бандл (а с ним и i18n) мог не загрузиться, поэтому тексты здесь свои.
+        // Язык — тот же ключ localStorage, что пишет src/i18n; нет перевода — английский.
+        var TEXTS = {
+            ru: {
+                title: 'BEAM не смог отрисовать интерфейс',
+                hint: 'Попробуйте в меню значка BEAM в трее пункт «Black window? Restart without GPU». ' +
+                    'Если не помогло, пришлите разработчику %APPDATA%\\Beam\\logs\\crash.log.',
+                empty: 'Интерфейс не загрузился (ошибок скрипта не было).'
+            },
+            en: {
+                title: 'BEAM failed to render the interface',
+                hint: 'Try "Black window? Restart without GPU" in the BEAM tray icon menu. ' +
+                    'If that does not help, send %APPDATA%\\Beam\\logs\\crash.log to the developer.',
+                empty: 'The interface did not load (no script errors).'
+            }
+        };
+        function bootLanguage() {
+            var code = null;
+            try { code = localStorage.getItem('beam-language'); } catch (e) {}
+            if (!code) code = (navigator.language || '').toLowerCase().indexOf('ru') === 0 ? 'ru' : 'en';
+            return TEXTS[code] ? code : 'en';
+        }
+        var text = TEXTS[bootLanguage()];
+
+        function show() {
+            var root = document.getElementById('root');
+            if (!root || root.childElementCount > 0) return;
+            var box = document.createElement('div');
+            box.style.cssText = 'position:fixed;inset:0;padding:32px;overflow:auto;background:#111;color:#eee;' +
+                'font:14px/1.5 system-ui,sans-serif;-webkit-app-region:drag;--wails-draggable:drag';
+            var title = document.createElement('h2');
+            title.textContent = text.title;
+            title.style.cssText = 'margin:0 0 12px;font-size:18px';
+            var hint = document.createElement('p');
+            hint.textContent = text.hint;
+            var details = document.createElement('pre');
+            details.textContent = errors.length ? errors.join('\n\n') : text.empty;
+            details.style.cssText = 'white-space:pre-wrap;user-select:text;color:#f88;font-size:12px';
+            box.appendChild(title);
+            box.appendChild(hint);
+            box.appendChild(details);
+            document.body.appendChild(box);
+            if (!errors.length) report('root still empty after timeout');
+            // React всё-таки смонтировался (медленный старт) - убираем экран.
+            new MutationObserver(function (_, observer) {
+                if (root.childElementCount > 0) {
+                    box.remove();
+                    observer.disconnect();
+                }
+            }).observe(root, { childList: true });
+        }
+
+        window.addEventListener('load', function () {
+            setTimeout(function () {
+                var root = document.getElementById('root');
+                if (root && root.childElementCount > 0) {
+                    window.removeEventListener('error', onError);
+                    window.removeEventListener('unhandledrejection', onError);
+                    return;
+                }
+                show();
+            }, 6000);
+        });
+    })();
+</script>
+<script src="./src/main.tsx" type="module"></script>
+</body>
+</html>

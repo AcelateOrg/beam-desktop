@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ota-updates.acelate.com/v1/schema/pointer.schema.json",
+  "title": "Beam OTA pointer (v1)",
+  "description": "Current version of Beam for one channel and target. Lives at /v1/channels/{channel}/{target}.json, signed by {file}.sig. Mirrors ota.Pointer in beam-desktop/internal/application/update/ota/types.go.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "kind", "channel", "target", "version", "manifest", "publishedAt"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "schemaVersion": { "const": 1 },
+    "kind": { "const": "beam.ota.pointer" },
+    "channel": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,31}$" },
+    "target": {
+      "type": "string",
+      "enum": ["windows-amd64", "windows-arm64", "linux-amd64", "linux-arm64", "darwin-amd64", "darwin-arm64", "darwin-universal"]
+    },
+    "version": { "type": "string", "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$" },
+    "manifest": {
+      "type": "string",
+      "description": "Site path of the release manifest: /v1/releases/{target}/{version}.json",
+      "pattern": "^/v1/releases/[a-z0-9]+-[a-z0-9]+/[0-9]+\\.[0-9]+\\.[0-9]+\\.json$"
+    },
+    "publishedAt": { "type": "string", "format": "date-time" }
+  }
+}

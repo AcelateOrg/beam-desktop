@@ -1,0 +1,42 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "Beam",
+  "outputfilename": "Beam",
+  "frontend:install": "bun install",
+  "frontend:build": "bun run build",
+  "frontend:dev:watcher": "bun run dev",
+  "frontend:dev:serverUrl": "auto",
+  "author": {
+    "name": "Blerk",
+    "email": "contact@acelate.com"
+  },
+  "version": "2",
+  "Info": {
+    "companyName": "Blerk",
+    "productName": "Beam",
+    "productVersion": "2.1.0",
+    "copyright": "© 2026 Blerk",
+    "comments": "Best proxy client",
+    "protocols": [
+      {
+        "scheme": "beam",
+        "description": "Beam Protocol",
+        "role": "Editor"
+      }
+    ]
+  },
+  "mac": {
+    "titleBar": {
+        "titlebarAppearsTransparent": true,
+        "hideTitle": true,
+        "hideTitleBar": false,
+        "fullSizeContent": true,
+        "useToolbar": false,
+        "hideToolbarSeparator": true
+    },
+    "about": {
+        "title": "Beam",
+        "message": "© 2026 Blerk"
+    }
+  }
+}

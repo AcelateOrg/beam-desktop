@@ -1,0 +1,43 @@
+# Tests and deploys ota-proxy/ to Cloudflare Workers - see ota-proxy/README.md.
+# Secrets: CLOUDFLARE_API_TOKEN (template "Edit Cloudflare Workers"), CLOUDFLARE_ACCOUNT_ID,
+#          OTA_PROXY_GITHUB_TOKEN (fine-grained, this repo only, Contents: read).
+name: OTA proxy
+
+on:
+  push:
+    branches: [main]
+    paths: ['ota-proxy/**', '.github/workflows/ota-proxy.yml']
+  pull_request:
+    paths: ['ota-proxy/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ota-proxy
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm test
+
+  deploy:
+    needs: test
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: ota-proxy
+          secrets: GITHUB_TOKEN
+        env:
+          GITHUB_TOKEN: ${{ secrets.OTA_PROXY_GITHUB_TOKEN }}

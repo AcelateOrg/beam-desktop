@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ota-updates.acelate.com/v1/schema/release.schema.json",
+  "title": "Beam OTA release (v1)",
+  "description": "Full, immutable description of one Beam version for one target. Lives at /v1/releases/{target}/{version}.json, signed by {file}.sig. Mirrors ota.Release in beam-desktop/internal/application/update/ota/types.go.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "kind", "target", "version", "releasedAt", "mandatory", "notes", "files"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "schemaVersion": { "const": 1 },
+    "kind": { "const": "beam.ota.release" },
+    "target": {
+      "type": "string",
+      "enum": ["windows-amd64", "windows-arm64", "linux-amd64", "linux-arm64", "darwin-amd64", "darwin-arm64", "darwin-universal"]
+    },
+    "version": { "$ref": "#/$defs/version" },
+    "releasedAt": { "type": "string", "format": "date-time" },
+    "mandatory": { "type": "boolean", "description": "The user cannot postpone this update." },
+    "minSupportedVersion": { "$ref": "#/$defs/version", "description": "Installs older than this must update." },
+    "notes": {
+      "type": "object",
+      "description": "Changelog lines per 2-letter language code.",
+      "propertyNames": { "pattern": "^[a-z]{2}$" },
+      "additionalProperties": {
+        "type": "array",
+        "items": { "type": "string", "minLength": 1 }
+      }
+    },
+    "files": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "size", "sha256", "urls"],
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Install-dir relative path with forward slashes.",
+            "pattern": "^(?!/)(?!\\.\\./)(?!.*[\\\\:]).+$"
+          },
+          "size": { "type": "integer", "minimum": 1 },
+          "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+          "urls": {
+            "type": "array",
+            "minItems": 1,
+            "description": "Mirrors of the same bytes, tried in order.",
+            "items": { "type": "string", "format": "uri", "pattern": "^https://" }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "version": { "type": "string", "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$" }
+  }
+}
